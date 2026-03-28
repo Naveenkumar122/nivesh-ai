@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}ETF Guide — NiveshAI{% endblock %}
+{% block content %}
+
+<h1>ETF Guide</h1>
+<p class="subtitle">Exchange-Traded Funds — the smartest way to start investing in India.</p>
+
+<!-- What is an ETF -->
+<div class="card">
+    <h2>What is an ETF?</h2>
+    <p style="line-height:1.8; color:var(--muted);">
+        An <strong style="color:var(--text);">Exchange-Traded Fund (ETF)</strong> is a basket of stocks that trades on the stock exchange just like a regular stock.
+        When you buy 1 unit of NIFTYBEES, you're essentially buying a tiny piece of all 50 NIFTY 50 companies at once.
+    </p>
+    <div class="grid grid-3" style="margin-top:20px;">
+        <div style="text-align:center; padding:16px;">
+            <div style="font-size:2em;">1 Unit</div>
+            <div style="color:var(--muted); font-size:0.85em;">of NIFTYBEES</div>
+        </div>
+        <div style="text-align:center; padding:16px;">
+            <div style="font-size:2em;">=</div>
+        </div>
+        <div style="text-align:center; padding:16px;">
+            <div style="font-size:2em;">50 Stocks</div>
+            <div style="color:var(--muted); font-size:0.85em;">Reliance, TCS, HDFC Bank...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ETF vs Mutual Fund vs Direct Stock -->
+<div class="card">
+    <h2>ETF vs Mutual Fund vs Direct Stock</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Feature</th>
+                <th>ETF</th>
+                <th>Mutual Fund</th>
+                <th>Direct Stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Cost (Expense Ratio)</td>
+                <td class="green">0.04 - 0.20%</td>
+                <td class="orange">1.0 - 2.5%</td>
+                <td class="green">Zero (just brokerage)</td>
+            </tr>
+            <tr>
+                <td>Diversification</td>
+                <td class="green">High (50+ stocks)</td>
+                <td class="green">High</td>
+                <td class="red">Low (1 stock)</td>
+            </tr>
+            <tr>
+                <td>Risk</td>
+                <td class="green">Low-Medium</td>
+                <td class="green">Low-Medium</td>
+                <td class="red">High</td>
+            </tr>
+            <tr>
+                <td>Knowledge Required</td>
+                <td class="green">Minimal</td>
+                <td class="green">Minimal</td>
+                <td class="red">High</td>
+            </tr>
+            <tr>
+                <td>Control</td>
+                <td class="orange">Medium</td>
+                <td class="red">Low</td>
+                <td class="green">Full</td>
+            </tr>
+            <tr>
+                <td>Liquidity</td>
+                <td class="green">Instant (trade anytime)</td>
+                <td class="orange">T+1 to T+3 days</td>
+                <td class="green">Instant</td>
+            </tr>
+            <tr>
+                <td>Minimum Investment</td>
+                <td class="green">~Rs.200 (1 unit)</td>
+                <td class="green">Rs.500 SIP</td>
+                <td class="orange">Varies (1 share)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Individual ETF Cards -->
+<h2 style="margin-top:30px; margin-bottom:16px;">Popular Indian ETFs</h2>
+<div id="etf-loading" class="loading">Fetching live ETF data</div>
+<div id="etf-cards" class="grid grid-2" style="display:none;"></div>
+
+<!-- Monthly SIP Strategy -->
+<div class="card" style="margin-top:20px;">
+    <h2>The Monthly SIP Strategy</h2>
+    <p style="color:var(--muted); line-height:1.8;">
+        <strong style="color:var(--text);">SIP (Systematic Investment Plan)</strong> means investing a fixed amount every month,
+        regardless of market conditions. This is the single most powerful strategy for beginners.
+    </p>
+    <div class="grid grid-3" style="margin-top:20px;">
+        <div class="card" style="background:rgba(34,197,94,0.05); border-color:rgba(34,197,94,0.2);">
+            <h3 class="green">Rupee Cost Averaging</h3>
+            <p style="color:var(--muted); font-size:0.85em; line-height:1.6;">
+                When market is high, you buy fewer units. When market drops, you buy more units.
+                Over time, your average cost is lower than the average price.
+            </p>
+        </div>
+        <div class="card" style="background:rgba(34,197,94,0.05); border-color:rgba(34,197,94,0.2);">
+            <h3 class="green">Removes Emotions</h3>
+            <p style="color:var(--muted); font-size:0.85em; line-height:1.6;">
+                No need to time the market. No panic selling. No FOMO buying.
+                Just a fixed amount, every month, automatically.
+            </p>
+        </div>
+        <div class="card" style="background:rgba(34,197,94,0.05); border-color:rgba(34,197,94,0.2);">
+            <h3 class="green">Power of Compounding</h3>
+            <p style="color:var(--muted); font-size:0.85em; line-height:1.6;">
+                Rs.5,000/month at 12% for 20 years = Rs.49.9 lakh.
+                You only invested Rs.12 lakh. The rest is compounding.
+            </p>
+        </div>
+    </div>
+    <div style="text-align:center; margin-top:16px;">
+        <a href="/sip-calculator" class="btn">Try the SIP Calculator</a>
+    </div>
+</div>
+
+<script>
+async function loadETFs() {
+    try {
+        const res = await fetch('/api/etf-data');
+        const etfs = await res.json();
+
+        const container = document.getElementById('etf-cards');
+        container.innerHTML = etfs.map(etf => `
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+                    <div>
+                        <h3>${etf.name}</h3>
+                        <span class="badge badge-purple">${etf.category}</span>
+                        <span class="badge badge-green">Expense: ${etf.expense_ratio}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.3em; font-weight:700;">Rs.${etf.current_price?.toLocaleString('en-IN') || 'N/A'}</div>
+                    </div>
+                </div>
+                <p style="color:var(--muted); font-size:0.85em; margin-bottom:12px;">${etf.description}</p>
+                <div style="display:flex; gap:20px; margin-bottom:16px; font-size:0.85em;">
+                    <div>
+                        <div style="color:var(--muted);">1M Return</div>
+                        <div class="${etf.returns_1m >= 0 ? 'green' : 'red'}" style="font-weight:600;">
+                            ${etf.returns_1m >= 0 ? '+' : ''}${etf.returns_1m}%
+                        </div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted);">6M Return</div>
+                        <div class="${etf.returns_6m >= 0 ? 'green' : 'red'}" style="font-weight:600;">
+                            ${etf.returns_6m >= 0 ? '+' : ''}${etf.returns_6m}%
+                        </div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted);">1Y Return</div>
+                        <div class="${etf.returns_1y >= 0 ? 'green' : 'red'}" style="font-weight:600;">
+                            ${etf.returns_1y >= 0 ? '+' : ''}${etf.returns_1y}%
+                        </div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted);">Volatility</div>
+                        <div style="font-weight:600;">${etf.volatility}%</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:20px;">
+                    <div style="flex:1;">
+                        <h3 class="green" style="font-size:0.9em;">Strengths</h3>
+                        <ul style="font-size:0.8em; color:var(--muted); padding-left:16px; line-height:1.8;">
+                            ${(etf.strengths || []).map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div style="flex:1;">
+                        <h3 class="red" style="font-size:0.9em;">Weaknesses</h3>
+                        <ul style="font-size:0.8em; color:var(--muted); padding-left:16px; line-height:1.8;">
+                            ${(etf.weaknesses || []).map(w => `<li>${w}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        document.getElementById('etf-loading').style.display = 'none';
+        container.style.display = 'grid';
+    } catch (err) {
+        document.getElementById('etf-loading').textContent = 'Failed to load ETF data. Please refresh.';
+    }
+}
+
+loadETFs();
+</script>
+
+{% endblock %}

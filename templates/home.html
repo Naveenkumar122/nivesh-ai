@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}NiveshAI — Smart Investment Advisor{% endblock %}
+{% block content %}
+
+<div style="text-align:center; padding: 40px 0 30px;">
+    <h1 style="font-size:2.5em;">Where Should Your Money Go?</h1>
+    <p class="subtitle" style="font-size:1.1em; max-width:600px; margin:12px auto 0;">
+        A data-driven guide to Indian ETFs and stocks.<br>
+        Answer 4 questions, get a personalized investment plan.
+    </p>
+</div>
+
+<!-- Quick Stats -->
+<div class="grid grid-3" style="margin-bottom: 30px;">
+    <div class="card" style="text-align:center;">
+        <div style="font-size:2em; font-weight:700;" class="green">NIFTY 50</div>
+        <div style="color:var(--muted); font-size:0.85em;">Large Cap — Top 50 Companies</div>
+        <a href="/stocks/nifty50" class="btn btn-outline" style="margin-top:12px; display:inline-block;">Explore</a>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="font-size:2em; font-weight:700;" class="orange">NIFTY NEXT 50</div>
+        <div style="color:var(--muted); font-size:0.85em;">Mid Cap — Stocks 51-100</div>
+        <a href="/stocks/niftynext50" class="btn btn-outline" style="margin-top:12px; display:inline-block;">Explore</a>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="font-size:2em; font-weight:700;" style="color:var(--accent);">ETFs</div>
+        <div style="color:var(--muted); font-size:0.85em;">Safe & Diversified Investing</div>
+        <a href="/etf-guide" class="btn btn-outline" style="margin-top:12px; display:inline-block;">Learn</a>
+    </div>
+</div>
+
+<!-- Risk Profiler -->
+<div class="card" id="quiz-section">
+    <h2>Find Your Investment Profile</h2>
+    <p class="subtitle">Answer these 4 questions to get a personalized allocation plan.</p>
+
+    <form id="riskQuiz">
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label>1. Your Age</label>
+                <input type="number" id="age" value="25" min="18" max="80" required>
+            </div>
+            <div class="form-group">
+                <label>2. Investment Horizon</label>
+                <select id="horizon">
+                    <option value="short">Short (1-3 years)</option>
+                    <option value="medium" selected>Medium (3-7 years)</option>
+                    <option value="long">Long (7+ years)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>3. How much risk can you handle?</label>
+                <select id="risk">
+                    <option value="low">Low — I can't sleep if my portfolio drops 5%</option>
+                    <option value="moderate" selected>Moderate — I can handle 10-15% drops</option>
+                    <option value="high">High — Bring it on, I'm here for 20%+ swings</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>4. If the market drops 20% tomorrow, you would:</label>
+                <select id="reaction">
+                    <option value="sell">Sell everything immediately</option>
+                    <option value="hold" selected>Hold and wait for recovery</option>
+                    <option value="buy_more">Buy more — it's a discount!</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn" style="margin-top:8px;">Get My Profile</button>
+    </form>
+</div>
+
+<!-- Result -->
+<div class="card" id="result-section" style="display:none;">
+    <div class="grid grid-2">
+        <div>
+            <h2 id="profile-label" style="margin-bottom:4px;"></h2>
+            <p id="profile-desc" class="subtitle"></p>
+            <div id="allocation-list"></div>
+            <p id="monthly-note" style="margin-top:16px; font-size:0.9em; color:var(--muted); line-height:1.6;"></p>
+        </div>
+        <div>
+            <h3 style="margin-bottom:12px;">Suggested Allocation</h3>
+            <canvas id="allocationChart" width="300" height="300"></canvas>
+        </div>
+    </div>
+    <div style="margin-top:20px; text-align:center;">
+        <a href="/etf-guide" class="btn" style="margin-right:10px;">Learn About ETFs</a>
+        <a href="/sip-calculator" class="btn btn-outline">Calculate SIP Returns</a>
+    </div>
+</div>
+
+<!-- Why ETFs Section -->
+<div class="card">
+    <h2>Why Start With ETFs?</h2>
+    <div class="grid grid-3" style="margin-top:16px;">
+        <div>
+            <h3 class="green">Diversification</h3>
+            <p style="color:var(--muted); font-size:0.9em; line-height:1.6;">
+                One Nifty 50 ETF gives you ownership in 50 of India's biggest companies.
+                If one stock crashes, others cushion the blow.
+            </p>
+        </div>
+        <div>
+            <h3 class="green">Low Cost</h3>
+            <p style="color:var(--muted); font-size:0.9em; line-height:1.6;">
+                NIFTYBEES charges just 0.04% expense ratio — you pay Rs.4 per Rs.10,000 invested per year.
+                Most mutual funds charge 1-2%.
+            </p>
+        </div>
+        <div>
+            <h3 class="green">SIP Friendly</h3>
+            <p style="color:var(--muted); font-size:0.9em; line-height:1.6;">
+                Invest a fixed amount every month. Rs.500, Rs.5000, or Rs.50,000 — the market
+                rewards consistency over timing.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Pyramid -->
+<div class="card">
+    <h2>The Investment Pyramid</h2>
+    <p class="subtitle">Build from the bottom up. Start safe, then grow.</p>
+    <div style="max-width:500px; margin:20px auto; text-align:center;">
+        <div style="width:30%; margin:0 auto; padding:16px; background:rgba(239,68,68,0.15); border-radius:8px 8px 0 0; border:1px solid rgba(239,68,68,0.2);">
+            <div style="font-weight:600;" class="red">Small Cap</div>
+            <div style="font-size:0.75em; color:var(--muted);">High Risk / High Return</div>
+        </div>
+        <div style="width:55%; margin:0 auto; padding:16px; background:rgba(245,158,11,0.15); border-left:1px solid rgba(245,158,11,0.2); border-right:1px solid rgba(245,158,11,0.2);">
+            <div style="font-weight:600;" class="orange">Mid Cap (NIFTY NEXT 50)</div>
+            <div style="font-size:0.75em; color:var(--muted);">Moderate Risk / Good Growth</div>
+        </div>
+        <div style="width:80%; margin:0 auto; padding:16px; background:rgba(34,197,94,0.15); border-left:1px solid rgba(34,197,94,0.2); border-right:1px solid rgba(34,197,94,0.2);">
+            <div style="font-weight:600;" class="green">Large Cap (NIFTY 50)</div>
+            <div style="font-size:0.75em; color:var(--muted);">Lower Risk / Stable Returns</div>
+        </div>
+        <div style="width:100%; margin:0 auto; padding:16px; background:rgba(124,92,252,0.15); border-radius:0 0 8px 8px; border:1px solid rgba(124,92,252,0.2);">
+            <div style="font-weight:600; color:var(--accent);">ETFs (Your Foundation)</div>
+            <div style="font-size:0.75em; color:var(--muted);">Lowest Risk / Consistent Growth / Start Here</div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Simple pie chart without external libs
+function drawPieChart(canvas, data) {
+    const ctx = canvas.getContext('2d');
+    const colors = ['#7c5cfc', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899'];
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(centerX, centerY) - 40;
+
+    let startAngle = -Math.PI / 2;
+    const entries = Object.entries(data);
+
+    entries.forEach(([label, value], i) => {
+        const sliceAngle = (value / 100) * 2 * Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fill();
+
+        // Label
+        const midAngle = startAngle + sliceAngle / 2;
+        const labelX = centerX + (radius + 25) * Math.cos(midAngle);
+        const labelY = centerY + (radius + 25) * Math.sin(midAngle);
+        ctx.fillStyle = '#e0e0e0';
+        ctx.font = '11px Segoe UI';
+        ctx.textAlign = midAngle > Math.PI/2 && midAngle < 3*Math.PI/2 ? 'right' : 'left';
+        ctx.fillText(`${label} (${value}%)`, labelX, labelY);
+
+        startAngle += sliceAngle;
+    });
+}
+
+document.getElementById('riskQuiz').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+
+    const data = {
+        age: document.getElementById('age').value,
+        horizon: document.getElementById('horizon').value,
+        risk: document.getElementById('risk').value,
+        reaction: document.getElementById('reaction').value,
+    };
+
+    const res = await fetch('/risk-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    const result = await res.json();
+
+    document.getElementById('profile-label').textContent = `You're a ${result.label} Investor`;
+    document.getElementById('profile-desc').textContent = result.description;
+    document.getElementById('monthly-note').textContent = result.monthly_note;
+
+    // Build allocation list
+    const listHtml = Object.entries(result.allocation)
+        .map(([k, v]) => `
+            <div style="display:flex; align-items:center; margin-bottom:8px;">
+                <div style="flex:1; font-size:0.9em;">${k}</div>
+                <div style="width:60px; text-align:right; font-weight:600;">${v}%</div>
+                <div style="flex:1; margin-left:12px;">
+                    <div class="score-bar">
+                        <div class="score-fill" style="width:${v}%; background:linear-gradient(90deg, var(--accent), var(--accent2));"></div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    document.getElementById('allocation-list').innerHTML = listHtml;
+
+    // Draw chart
+    drawPieChart(document.getElementById('allocationChart'), result.allocation);
+
+    document.getElementById('result-section').style.display = 'block';
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+
+    btn.disabled = false;
+    btn.textContent = 'Get My Profile';
+});
+</script>
+
+{% endblock %}

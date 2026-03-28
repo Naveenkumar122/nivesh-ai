@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}SIP Calculator — NiveshAI{% endblock %}
+{% block content %}
+
+<h1>SIP Calculator</h1>
+<p class="subtitle">See how small monthly investments grow into wealth over time.</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h2>Calculate Your SIP Returns</h2>
+        <form id="sipForm">
+            <div class="form-group">
+                <label>Monthly Investment (Rs.)</label>
+                <input type="number" id="amount" value="5000" min="100" step="any" required>
+            </div>
+            <div class="form-group">
+                <label>Investment Period (Years)</label>
+                <input type="range" id="years" min="1" max="30" value="10"
+                    oninput="document.getElementById('yearsLabel').textContent = this.value + ' years'"
+                    style="background:transparent; padding:4px 0;">
+                <div style="display:flex; justify-content:space-between; font-size:0.8em; color:var(--muted);">
+                    <span>1 yr</span>
+                    <span id="yearsLabel" style="color:var(--accent); font-weight:600;">10 years</span>
+                    <span>30 yrs</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Expected Annual Return (%)</label>
+                <select id="return_pct">
+                    <option value="8">8% — Conservative (Debt/Gold)</option>
+                    <option value="10">10% — Moderate (Large Cap ETF)</option>
+                    <option value="12" selected>12% — Average (Nifty 50 historical)</option>
+                    <option value="14">14% — Optimistic (Mid Cap)</option>
+                    <option value="16">16% — Aggressive (Small Cap)</option>
+                </select>
+            </div>
+            <button type="submit" class="btn" style="width:100%;">Calculate</button>
+        </form>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none;">
+        <h2>Your SIP Projection</h2>
+        <div style="text-align:center; padding:20px 0;">
+            <div style="color:var(--muted); font-size:0.9em;">Future Value</div>
+            <div id="futureValue" style="font-size:2.5em; font-weight:700; background:linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;"></div>
+        </div>
+
+        <div style="display:flex; gap:16px; margin-bottom:20px;">
+            <div style="flex:1; text-align:center; padding:12px; background:rgba(34,197,94,0.08); border-radius:10px;">
+                <div style="font-size:0.8em; color:var(--muted);">Total Invested</div>
+                <div id="totalInvested" style="font-weight:700; font-size:1.2em;" class="green"></div>
+            </div>
+            <div style="flex:1; text-align:center; padding:12px; background:rgba(124,92,252,0.08); border-radius:10px;">
+                <div style="font-size:0.8em; color:var(--muted);">Returns Earned</div>
+                <div id="totalReturns" style="font-weight:700; font-size:1.2em; color:var(--accent);"></div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.85em; margin-bottom:4px;">
+                <span>Invested</span>
+                <span>Returns</span>
+            </div>
+            <div style="display:flex; height:24px; border-radius:12px; overflow:hidden;">
+                <div id="investedBar" style="background:var(--green); transition:width 0.5s;"></div>
+                <div id="returnsBar" style="background:var(--accent); transition:width 0.5s;"></div>
+            </div>
+        </div>
+
+        <div id="multiplier" style="text-align:center; font-size:0.9em; color:var(--muted);"></div>
+
+        <!-- Year by year breakdown -->
+        <div style="margin-top:20px;">
+            <h3 style="margin-bottom:8px;">Year-by-Year Growth</h3>
+            <div id="yearlyBreakdown" style="max-height:300px; overflow-y:auto;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Comparison Table -->
+<div class="card" style="margin-top:20px;">
+    <h2>SIP Comparison: Rs.5,000/month</h2>
+    <p class="subtitle">How the same Rs.5,000 monthly SIP grows across different return rates and time horizons.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Investment Type</th>
+                <th>Expected Return</th>
+                <th>5 Years</th>
+                <th>10 Years</th>
+                <th>15 Years</th>
+                <th>20 Years</th>
+                <th>25 Years</th>
+            </tr>
+        </thead>
+        <tbody id="comparisonTable"></tbody>
+    </table>
+</div>
+
+<script>
+function formatINR(num) {
+    if (num >= 10000000) return 'Rs.' + (num / 10000000).toFixed(2) + ' Cr';
+    if (num >= 100000) return 'Rs.' + (num / 100000).toFixed(2) + ' L';
+    return 'Rs.' + num.toLocaleString('en-IN');
+}
+
+function calcSIP(amount, years, returnPct) {
+    const monthlyRate = returnPct / 100 / 12;
+    const months = years * 12;
+    const totalInvested = amount * months;
+    let futureValue;
+    if (monthlyRate === 0) {
+        futureValue = totalInvested;
+    } else {
+        futureValue = amount * (((Math.pow(1 + monthlyRate, months)) - 1) / monthlyRate) * (1 + monthlyRate);
+    }
+    const totalReturns = futureValue - totalInvested;
+    return {
+        total_invested: Math.round(totalInvested),
+        future_value: Math.round(futureValue),
+        total_returns: Math.round(totalReturns),
+        wealth_multiplier: (futureValue / totalInvested).toFixed(2),
+    };
+}
+
+document.getElementById('sipForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const amount = parseFloat(document.getElementById('amount').value);
+    const years = parseInt(document.getElementById('years').value);
+    const returnPct = parseFloat(document.getElementById('return_pct').value);
+
+    const result = calcSIP(amount, years, returnPct);
+
+    document.getElementById('futureValue').textContent = formatINR(result.future_value);
+    document.getElementById('totalInvested').textContent = formatINR(result.total_invested);
+    document.getElementById('totalReturns').textContent = formatINR(result.total_returns);
+
+    const investPct = (result.total_invested / result.future_value) * 100;
+    document.getElementById('investedBar').style.width = investPct + '%';
+    document.getElementById('returnsBar').style.width = (100 - investPct) + '%';
+
+    document.getElementById('multiplier').textContent =
+        `Your money grew ${result.wealth_multiplier}x — you invested ${formatINR(result.total_invested)} and earned ${formatINR(result.total_returns)} in returns!`;
+
+    // Year by year
+    let yearlyHtml = '<table><tr><th>Year</th><th>Invested</th><th>Value</th><th>Gain</th></tr>';
+    for (let y = 1; y <= years; y++) {
+        const r = calcSIP(amount, y, returnPct);
+        const gain = ((r.future_value - r.total_invested) / r.total_invested * 100).toFixed(0);
+        yearlyHtml += `<tr>
+            <td>${y}</td>
+            <td>${formatINR(r.total_invested)}</td>
+            <td style="font-weight:600;">${formatINR(r.future_value)}</td>
+            <td class="green">+${gain}%</td>
+        </tr>`;
+    }
+    yearlyHtml += '</table>';
+    document.getElementById('yearlyBreakdown').innerHTML = yearlyHtml;
+
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+});
+
+// Build comparison table
+function buildComparison() {
+    const types = [
+        { name: 'Fixed Deposit', rate: 7, class: '' },
+        { name: 'Gold ETF', rate: 9, class: 'orange' },
+        { name: 'Nifty 50 ETF', rate: 12, class: 'green' },
+        { name: 'Nifty Next 50 ETF', rate: 14, class: 'green' },
+        { name: 'Mid Cap Fund', rate: 16, class: 'green' },
+    ];
+    const periods = [5, 10, 15, 20, 25];
+
+    let html = '';
+    for (const type of types) {
+        html += `<tr><td style="font-weight:600;">${type.name}</td><td>${type.rate}%</td>`;
+        for (const yr of periods) {
+            const r = calcSIP(5000, yr, type.rate);
+            html += `<td class="${type.class}" style="font-weight:600;">${formatINR(r.future_value)}</td>`;
+        }
+        html += '</tr>';
+    }
+
+    // Add invested row
+    html += '<tr style="color:var(--muted);"><td>Total Invested</td><td>-</td>';
+    for (const yr of periods) {
+        html += `<td>${formatINR(5000 * yr * 12)}</td>`;
+    }
+    html += '</tr>';
+
+    document.getElementById('comparisonTable').innerHTML = html;
+}
+
+buildComparison();
+</script>
+
+{% endblock %}

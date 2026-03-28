@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NiveshAI{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --border: #1e1e2e;
+            --text: #e0e0e0;
+            --muted: #888;
+            --accent: #7c5cfc;
+            --accent2: #a855f7;
+            --green: #22c55e;
+            --red: #ef4444;
+            --orange: #f59e0b;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        nav {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            height: 60px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo {
+            font-size: 1.4em;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-right: 40px;
+        }
+        nav a {
+            color: var(--muted);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        nav a:hover, nav a.active {
+            color: var(--text);
+            background: rgba(124,92,252,0.1);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        h1 { font-size: 2em; margin-bottom: 8px; }
+        h2 { font-size: 1.4em; margin-bottom: 12px; }
+        h3 { font-size: 1.1em; margin-bottom: 8px; }
+        .subtitle { color: var(--muted); margin-bottom: 24px; }
+        .green { color: var(--green); }
+        .red { color: var(--red); }
+        .orange { color: var(--orange); }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+        .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .badge-orange { background: rgba(245,158,11,0.15); color: var(--orange); }
+        .badge-purple { background: rgba(124,92,252,0.15); color: var(--accent); }
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(124,92,252,0.3);
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+        .btn-outline:hover {
+            background: rgba(124,92,252,0.1);
+            box-shadow: none;
+            transform: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            color: var(--muted);
+            font-size: 0.8em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        tr:hover { background: rgba(124,92,252,0.03); }
+        .grid { display: grid; gap: 20px; }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+        input, select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text);
+            font-size: 0.95em;
+            outline: none;
+            transition: border 0.2s;
+        }
+        input:focus, select:focus { border-color: var(--accent); }
+        label { display: block; margin-bottom: 4px; font-size: 0.85em; color: var(--muted); }
+        .form-group { margin-bottom: 16px; }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted);
+        }
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .score-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: var(--border);
+            overflow: hidden;
+        }
+        .score-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+        .disclaimer {
+            background: rgba(245,158,11,0.08);
+            border: 1px solid rgba(245,158,11,0.2);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.8em;
+            color: var(--orange);
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            nav { flex-wrap: wrap; height: auto; padding: 12px; gap: 8px; }
+            .container { padding: 16px; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo">NiveshAI</div>
+        <a href="/" class="{{ 'active' if request.path == '/' }}">Home</a>
+        <a href="/etf-guide" class="{{ 'active' if request.path == '/etf-guide' }}">ETF Guide</a>
+        <a href="/stocks/nifty50" class="{{ 'active' if 'nifty50' in request.path }}">NIFTY 50</a>
+        <a href="/stocks/niftynext50" class="{{ 'active' if 'niftynext50' in request.path }}">NIFTY NEXT 50</a>
+        <a href="/sip-calculator" class="{{ 'active' if 'sip' in request.path }}">SIP Calculator</a>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+        <div class="disclaimer">
+            Disclaimer: NiveshAI is for educational purposes only. This is NOT financial advice.
+            Past performance does not guarantee future results. Always consult a SEBI-registered
+            financial advisor before making investment decisions.
+        </div>
+    </div>
+</body>
+</html>

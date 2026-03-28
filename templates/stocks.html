@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — NiveshAI{% endblock %}
+{% block content %}
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+    <h1>{{ title }}</h1>
+    <button class="btn btn-outline" onclick="refreshData()" id="refreshBtn">Refresh Data</button>
+</div>
+<p class="subtitle">Stocks scored 0-100 based on returns, valuation, volatility, and momentum. Click any column to sort.</p>
+
+<div id="loading" class="loading">Fetching live stock data — this may take a minute on first load</div>
+
+<div id="stock-content" style="display:none;">
+    <!-- Summary Cards -->
+    <div class="grid grid-3" id="summary-cards"></div>
+
+    <!-- Filters -->
+    <div class="card" style="padding:14px 20px;">
+        <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+                <input type="text" id="searchInput" placeholder="Search stock name or ticker..." oninput="filterStocks()">
+            </div>
+            <div>
+                <select id="sectorFilter" onchange="filterStocks()" style="width:auto;">
+                    <option value="">All Sectors</option>
+                </select>
+            </div>
+            <div>
+                <select id="sortBy" onchange="sortStocks()" style="width:auto;">
+                    <option value="score">Sort by Score</option>
+                    <option value="returns_1y">Sort by 1Y Return</option>
+                    <option value="returns_1m">Sort by 1M Return</option>
+                    <option value="volatility">Sort by Volatility (Low)</option>
+                    <option value="pe_ratio">Sort by PE Ratio</option>
+                    <option value="current_price">Sort by Price</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Table -->
+    <div class="card" style="overflow-x:auto;">
+        <table id="stockTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Stock</th>
+                    <th>Sector</th>
+                    <th>Price (Rs.)</th>
+                    <th>1M</th>
+                    <th>6M</th>
+                    <th>1Y</th>
+                    <th>PE Ratio</th>
+                    <th>Volatility</th>
+                    <th>Max Drawdown</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody id="stockBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let allStocks = [];
+let filteredStocks = [];
+
+function getScoreColor(score) {
+    if (score >= 75) return 'var(--green)';
+    if (score >= 50) return 'var(--orange)';
+    return 'var(--red)';
+}
+
+function getScoreLabel(score) {
+    if (score >= 80) return 'Strong Buy';
+    if (score >= 65) return 'Buy';
+    if (score >= 50) return 'Hold';
+    if (score >= 35) return 'Weak';
+    return 'Avoid';
+}
+
+function renderSummary(stocks) {
+    const avgScore = (stocks.reduce((a, s) => a + s.score, 0) / stocks.length).toFixed(1);
+    const topStock = stocks[0];
+    const avgReturn = (stocks.reduce((a, s) => a + s.returns_1y, 0) / stocks.length).toFixed(1);
+
+    const sectors = {};
+    stocks.forEach(s => {
+        if (!sectors[s.sector]) sectors[s.sector] = [];
+        sectors[s.sector].push(s.score);
+    });
+    const bestSector = Object.entries(sectors)
+        .map(([name, scores]) => ({ name, avg: scores.reduce((a, b) => a + b, 0) / scores.length }))
+        .sort((a, b) => b.avg - a.avg)[0];
+
+    document.getElementById('summary-cards').innerHTML = `
+        <div class="card" style="text-align:center;">
+            <div style="color:var(--muted); font-size:0.85em;">Top Ranked Stock</div>
+            <div style="font-size:1.4em; font-weight:700; margin:4px 0;">${topStock.name}</div>
+            <span class="badge badge-green">Score: ${topStock.score}/100</span>
+        </div>
+        <div class="card" style="text-align:center;">
+            <div style="color:var(--muted); font-size:0.85em;">Average 1Y Return</div>
+            <div style="font-size:1.4em; font-weight:700; margin:4px 0;" class="${avgReturn >= 0 ? 'green' : 'red'}">
+                ${avgReturn >= 0 ? '+' : ''}${avgReturn}%
+            </div>
+            <span class="badge badge-purple">Avg Score: ${avgScore}</span>
+        </div>
+        <div class="card" style="text-align:center;">
+            <div style="color:var(--muted); font-size:0.85em;">Best Performing Sector</div>
+            <div style="font-size:1.4em; font-weight:700; margin:4px 0;">${bestSector.name}</div>
+            <span class="badge badge-orange">Avg Score: ${bestSector.avg.toFixed(1)}</span>
+        </div>
+    `;
+}
+
+function renderTable(stocks) {
+    const tbody = document.getElementById('stockBody');
+    tbody.innerHTML = stocks.map((s, i) => `
+        <tr>
+            <td>${i + 1}</td>
+            <td>
+                <div style="font-weight:600;">${s.name}</div>
+                <div style="font-size:0.75em; color:var(--muted);">${s.ticker.replace('.NS', '')}</div>
+            </td>
+            <td><span class="badge badge-purple">${s.sector}</span></td>
+            <td style="font-weight:600;">Rs.${s.current_price.toLocaleString('en-IN')}</td>
+            <td class="${s.returns_1m >= 0 ? 'green' : 'red'}">${s.returns_1m >= 0 ? '+' : ''}${s.returns_1m}%</td>
+            <td class="${s.returns_6m >= 0 ? 'green' : 'red'}">${s.returns_6m >= 0 ? '+' : ''}${s.returns_6m}%</td>
+            <td class="${s.returns_1y >= 0 ? 'green' : 'red'}">${s.returns_1y >= 0 ? '+' : ''}${s.returns_1y}%</td>
+            <td>${s.pe_ratio ? s.pe_ratio.toFixed(1) : 'N/A'}</td>
+            <td>${s.volatility}%</td>
+            <td class="red">${s.max_drawdown}%</td>
+            <td>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="font-weight:700; color:${getScoreColor(s.score)};">${s.score}</div>
+                    <div style="flex:1; min-width:60px;">
+                        <div class="score-bar">
+                            <div class="score-fill" style="width:${s.score}%; background:${getScoreColor(s.score)};"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="font-size:0.7em; color:${getScoreColor(s.score)};">${getScoreLabel(s.score)}</div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function populateSectorFilter(stocks) {
+    const sectors = [...new Set(stocks.map(s => s.sector))].sort();
+    const select = document.getElementById('sectorFilter');
+    sectors.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        select.appendChild(opt);
+    });
+}
+
+function filterStocks() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const sector = document.getElementById('sectorFilter').value;
+
+    filteredStocks = allStocks.filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(search) || s.ticker.toLowerCase().includes(search);
+        const matchesSector = !sector || s.sector === sector;
+        return matchesSearch && matchesSector;
+    });
+
+    renderTable(filteredStocks);
+}
+
+function sortStocks() {
+    const key = document.getElementById('sortBy').value;
+    const ascending = key === 'volatility' || key === 'pe_ratio';
+
+    filteredStocks.sort((a, b) => {
+        const va = a[key] ?? 999;
+        const vb = b[key] ?? 999;
+        return ascending ? va - vb : vb - va;
+    });
+
+    renderTable(filteredStocks);
+}
+
+async function loadStocks() {
+    try {
+        const res = await fetch('/api/stocks/{{ category }}');
+        allStocks = await res.json();
+        filteredStocks = [...allStocks];
+
+        renderSummary(allStocks);
+        renderTable(allStocks);
+        populateSectorFilter(allStocks);
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('stock-content').style.display = 'block';
+    } catch (err) {
+        document.getElementById('loading').textContent = 'Failed to load stock data. Please refresh.';
+    }
+}
+
+async function refreshData() {
+    const btn = document.getElementById('refreshBtn');
+    btn.disabled = true;
+    btn.textContent = 'Refreshing...';
+
+    await fetch('/api/refresh/{{ category }}');
+    document.getElementById('stock-content').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('loading').textContent = 'Refreshing live data...';
+    await loadStocks();
+
+    btn.disabled = false;
+    btn.textContent = 'Refresh Data';
+}
+
+loadStocks();
+</script>
+
+{% endblock %}
