@@ -104,33 +104,19 @@ function formatINR(num) {
     return 'Rs.' + num.toLocaleString('en-IN');
 }
 
-function calcSIP(amount, years, returnPct) {
-    const monthlyRate = returnPct / 100 / 12;
-    const months = years * 12;
-    const totalInvested = amount * months;
-    let futureValue;
-    if (monthlyRate === 0) {
-        futureValue = totalInvested;
-    } else {
-        futureValue = amount * (((Math.pow(1 + monthlyRate, months)) - 1) / monthlyRate) * (1 + monthlyRate);
-    }
-    const totalReturns = futureValue - totalInvested;
-    return {
-        total_invested: Math.round(totalInvested),
-        future_value: Math.round(futureValue),
-        total_returns: Math.round(totalReturns),
-        wealth_multiplier: (futureValue / totalInvested).toFixed(2),
-    };
-}
-
-document.getElementById('sipForm').addEventListener('submit', (e) => {
+document.getElementById('sipForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const amount = parseFloat(document.getElementById('amount').value);
     const years = parseInt(document.getElementById('years').value);
     const returnPct = parseFloat(document.getElementById('return_pct').value);
 
-    const result = calcSIP(amount, years, returnPct);
+    const resp = await fetch('/api/sip-calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, years, return_pct: returnPct, include_yearly: true }),
+    });
+    const result = await resp.json();
 
     document.getElementById('futureValue').textContent = formatINR(result.future_value);
     document.getElementById('totalInvested').textContent = formatINR(result.total_invested);
@@ -143,16 +129,14 @@ document.getElementById('sipForm').addEventListener('submit', (e) => {
     document.getElementById('multiplier').textContent =
         `Your money grew ${result.wealth_multiplier}x — you invested ${formatINR(result.total_invested)} and earned ${formatINR(result.total_returns)} in returns!`;
 
-    // Year by year
+    // Year by year from API response
     let yearlyHtml = '<table><tr><th>Year</th><th>Invested</th><th>Value</th><th>Gain</th></tr>';
-    for (let y = 1; y <= years; y++) {
-        const r = calcSIP(amount, y, returnPct);
-        const gain = ((r.future_value - r.total_invested) / r.total_invested * 100).toFixed(0);
+    for (const r of result.yearly) {
         yearlyHtml += `<tr>
-            <td>${y}</td>
+            <td>${r.year}</td>
             <td>${formatINR(r.total_invested)}</td>
             <td style="font-weight:600;">${formatINR(r.future_value)}</td>
-            <td class="green">+${gain}%</td>
+            <td class="green">+${r.gain_pct}%</td>
         </tr>`;
     }
     yearlyHtml += '</table>';
@@ -162,31 +146,24 @@ document.getElementById('sipForm').addEventListener('submit', (e) => {
     document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
 });
 
-// Build comparison table
-function buildComparison() {
-    const types = [
-        { name: 'Fixed Deposit', rate: 7, class: '' },
-        { name: 'Gold ETF', rate: 9, class: 'orange' },
-        { name: 'Nifty 50 ETF', rate: 12, class: 'green' },
-        { name: 'Nifty Next 50 ETF', rate: 14, class: 'green' },
-        { name: 'Mid Cap Fund', rate: 16, class: 'green' },
-    ];
-    const periods = [5, 10, 15, 20, 25];
+// Build comparison table from API
+async function buildComparison() {
+    const resp = await fetch('/api/sip-comparison');
+    const data = await resp.json();
 
     let html = '';
-    for (const type of types) {
-        html += `<tr><td style="font-weight:600;">${type.name}</td><td>${type.rate}%</td>`;
-        for (const yr of periods) {
-            const r = calcSIP(5000, yr, type.rate);
-            html += `<td class="${type.class}" style="font-weight:600;">${formatINR(r.future_value)}</td>`;
+    for (const row of data.rows) {
+        html += `<tr><td style="font-weight:600;">${row.name}</td><td>${row.rate}%</td>`;
+        for (const yr of data.periods) {
+            html += `<td class="${row.css_class}" style="font-weight:600;">${formatINR(row.values[yr])}</td>`;
         }
         html += '</tr>';
     }
 
-    // Add invested row
+    // Invested row
     html += '<tr style="color:var(--muted);"><td>Total Invested</td><td>-</td>';
-    for (const yr of periods) {
-        html += `<td>${formatINR(5000 * yr * 12)}</td>`;
+    for (const yr of data.periods) {
+        html += `<td>${formatINR(data.invested[yr])}</td>`;
     }
     html += '</tr>';
 

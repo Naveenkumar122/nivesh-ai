@@ -124,14 +124,38 @@ def api_stock_detail(ticker):
 
 @app.route("/api/sip-calculate", methods=["POST"])
 def api_sip_calculate():
-    """Calculate SIP returns."""
+    """Calculate SIP returns with optional yearly breakdown."""
     params = request.json
     result = calculate_sip(
         monthly_amount=float(params["amount"]),
         years=int(params["years"]),
         expected_return_pct=float(params["return_pct"]),
+        include_yearly=params.get("include_yearly", False),
     )
     return jsonify(result)
+
+
+@app.route("/api/sip-comparison")
+def api_sip_comparison():
+    """Pre-computed SIP comparison table for fixed Rs.5000/month."""
+    types = [
+        {"name": "Fixed Deposit", "rate": 7, "css_class": ""},
+        {"name": "Gold ETF", "rate": 9, "css_class": "orange"},
+        {"name": "Nifty 50 ETF", "rate": 12, "css_class": "green"},
+        {"name": "Nifty Next 50 ETF", "rate": 14, "css_class": "green"},
+        {"name": "Mid Cap Fund", "rate": 16, "css_class": "green"},
+    ]
+    periods = [5, 10, 15, 20, 25]
+    rows = []
+    for t in types:
+        values = {}
+        for yr in periods:
+            r = calculate_sip(5000, yr, t["rate"])
+            values[str(yr)] = r["future_value"]
+        rows.append({"name": t["name"], "rate": t["rate"], "css_class": t["css_class"], "values": values})
+
+    invested = {str(yr): 5000 * yr * 12 for yr in periods}
+    return jsonify({"rows": rows, "invested": invested, "periods": periods})
 
 
 @app.route("/api/refresh/<category>")

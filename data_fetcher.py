@@ -190,21 +190,22 @@ def get_etf_data():
     return results
 
 
-def calculate_sip(monthly_amount, years, expected_return_pct):
-    """Calculate SIP returns."""
+def _sip_future_value(monthly_amount, months, monthly_rate):
+    """Core SIP future value calculation."""
+    if monthly_rate == 0:
+        return monthly_amount * months
+    return monthly_amount * (((1 + monthly_rate) ** months - 1) / monthly_rate) * (1 + monthly_rate)
+
+
+def calculate_sip(monthly_amount, years, expected_return_pct, include_yearly=False):
+    """Calculate SIP returns with optional year-by-year breakdown."""
     monthly_rate = expected_return_pct / 100 / 12
     months = years * 12
     total_invested = monthly_amount * months
-
-    # FV of annuity formula
-    if monthly_rate == 0:
-        future_value = total_invested
-    else:
-        future_value = monthly_amount * (((1 + monthly_rate) ** months - 1) / monthly_rate) * (1 + monthly_rate)
-
+    future_value = _sip_future_value(monthly_amount, months, monthly_rate)
     returns = future_value - total_invested
 
-    return {
+    result = {
         "monthly_amount": monthly_amount,
         "years": years,
         "expected_return": expected_return_pct,
@@ -213,3 +214,20 @@ def calculate_sip(monthly_amount, years, expected_return_pct):
         "total_returns": round(returns, 2),
         "wealth_multiplier": round(future_value / total_invested, 2),
     }
+
+    if include_yearly:
+        yearly = []
+        for y in range(1, years + 1):
+            m = y * 12
+            inv = monthly_amount * m
+            fv = _sip_future_value(monthly_amount, m, monthly_rate)
+            gain_pct = round((fv - inv) / inv * 100) if inv else 0
+            yearly.append({
+                "year": y,
+                "total_invested": round(inv, 2),
+                "future_value": round(fv, 2),
+                "gain_pct": gain_pct,
+            })
+        result["yearly"] = yearly
+
+    return result
