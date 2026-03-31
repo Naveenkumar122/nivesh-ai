@@ -1,15 +1,183 @@
 """
 NiveshAI — Indian Stock & ETF Investment Advisor
 """
-from flask import Flask, render_template, request, jsonify
+import os
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from data_fetcher import get_scored_stocks, get_etf_data, calculate_sip, fetch_stock_data
 from config import ALLOCATION, ETFS, NIFTY_50, NIFTY_NEXT_50, SECTORS
-import json
+from models import db, User, Holding
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.urandom(24).hex()
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///niveshai.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+login_manager.login_message_category = "info"
 
 # Cache for scored stocks (fetched on demand)
 stock_cache = {}
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+
+# ── Auth Routes ──────────────────────────────────────────────
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if not username or not email or not password:
+            flash("All fields are required.", "error")
+            return render_template("register.html")
+
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.", "error")
+            return render_template("register.html")
+
+        if User.query.filter((User.username == username) | (User.email == email)).first():
+            flash("Username or email already taken.", "error")
+            return render_template("register.html")
+
+        user = User(
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(password),
+        )
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        flash("Welcome to NiveshAI!", "success")
+        return redirect(url_for("dashboard"))
+
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            next_page = request.args.get("next")
+            return redirect(next_page or url_for("dashboard"))
+
+        flash("Invalid username or password.", "error")
+        return render_template("login.html")
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("home"))
+
+
+# ── Dashboard ────────────────────────────────────────────────
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    import config
+    return render_template("dashboard.html", config=config)
+
+
+@app.route("/api/holdings")
+@login_required
+def api_holdings():
+    """Fetch live data for user's holdings."""
+    holdings = Holding.query.filter_by(user_id=current_user.id).all()
+    result = []
+    for h in holdings:
+        data = fetch_stock_data(h.ticker)
+        if data:
+            result.append({
+                "id": h.id,
+                "ticker": h.ticker,
+                "name": data.get("name", h.ticker),
+                "sector": data.get("sector", "Other"),
+                "current_price": data.get("current_price"),
+                "returns_1m": data.get("returns_1m"),
+                "returns_6m": data.get("returns_6m"),
+                "returns_1y": data.get("returns_1y"),
+                "volatility": data.get("volatility"),
+                "pe_ratio": data.get("pe_ratio"),
+                "52w_high": data.get("52w_high"),
+                "52w_low": data.get("52w_low"),
+                "added_at": h.added_at.strftime("%Y-%m-%d"),
+            })
+        else:
+            result.append({
+                "id": h.id,
+                "ticker": h.ticker,
+                "name": NIFTY_50.get(h.ticker) or NIFTY_NEXT_50.get(h.ticker) or h.ticker,
+                "error": "Could not fetch data",
+                "added_at": h.added_at.strftime("%Y-%m-%d"),
+            })
+    return jsonify(result)
+
+
+@app.route("/api/holdings/add", methods=["POST"])
+@login_required
+def add_holding():
+    """Add a stock to user's holdings."""
+    ticker = request.json.get("ticker", "").strip()
+    if not ticker:
+        return jsonify({"error": "Ticker is required"}), 400
+
+    existing = Holding.query.filter_by(user_id=current_user.id, ticker=ticker).first()
+    if existing:
+        return jsonify({"error": "Stock already in your holdings"}), 409
+
+    holding = Holding(user_id=current_user.id, ticker=ticker)
+    db.session.add(holding)
+    db.session.commit()
+    return jsonify({"status": "added", "ticker": ticker})
+
+
+@app.route("/api/holdings/remove", methods=["POST"])
+@login_required
+def remove_holding():
+    """Remove a stock from user's holdings."""
+    ticker = request.json.get("ticker", "").strip()
+    if not ticker:
+        return jsonify({"error": "Ticker is required"}), 400
+
+    holding = Holding.query.filter_by(user_id=current_user.id, ticker=ticker).first()
+    if not holding:
+        return jsonify({"error": "Stock not in your holdings"}), 404
+
+    db.session.delete(holding)
+    db.session.commit()
+    return jsonify({"status": "removed", "ticker": ticker})
+
+
+# ── Original Routes ──────────────────────────────────────────
 
 
 @app.route("/")
@@ -172,8 +340,11 @@ def sip_calculator():
 
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     print("\n NiveshAI running at http://localhost:5000")
     print("  /              — Home + Risk Profiler")
+    print("  /dashboard     — Your Holdings Dashboard")
     print("  /etf-guide     — ETF Education")
     print("  /stocks/nifty50 — NIFTY 50 Analysis")
     print("  /stocks/niftynext50 — NIFTY NEXT 50 Analysis")

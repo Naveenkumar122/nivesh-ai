@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — NiveshAI{% endblock %}
+{% block content %}
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+    <div>
+        <h1>My Holdings</h1>
+        <p class="subtitle">Track your stocks in one place, {{ current_user.username }}</p>
+    </div>
+    <button class="btn" onclick="openAddModal()">+ Add Stock</button>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-3" id="summary-cards">
+    <div class="card" style="text-align:center;">
+        <div style="color:var(--muted); font-size:0.85em;">Total Holdings</div>
+        <div style="font-size:2em; font-weight:700;" id="totalCount">—</div>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="color:var(--muted); font-size:0.85em;">Average 1Y Return</div>
+        <div style="font-size:2em; font-weight:700;" id="avgReturn">—</div>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="color:var(--muted); font-size:0.85em;">Top Performer (1Y)</div>
+        <div style="font-size:1.4em; font-weight:700;" id="topPerformer">—</div>
+        <div style="font-size:0.85em; color:var(--muted);" id="topPerformerReturn"></div>
+    </div>
+</div>
+
+<!-- Loading -->
+<div id="loading" class="loading" style="display:none;">Loading your holdings</div>
+
+<!-- Empty State -->
+<div id="empty-state" style="display:none; text-align:center; padding:60px 20px;">
+    <div style="font-size:3em; margin-bottom:16px; opacity:0.3;">&#x1F4C8;</div>
+    <h2 style="margin-bottom:8px;">No stocks yet</h2>
+    <p style="color:var(--muted); margin-bottom:24px;">
+        Add stocks from the <a href="/stocks/nifty50" style="color:var(--accent);">NIFTY 50</a> or
+        <a href="/stocks/niftynext50" style="color:var(--accent);">NIFTY NEXT 50</a> pages,<br>
+        or use the button above to add by ticker.
+    </p>
+</div>
+
+<!-- Holdings Table -->
+<div id="holdings-table" class="card" style="overflow-x:auto; display:none;">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Stock</th>
+                <th>Sector</th>
+                <th>Price (Rs.)</th>
+                <th>1M</th>
+                <th>6M</th>
+                <th>1Y</th>
+                <th>PE Ratio</th>
+                <th>52W Range</th>
+                <th>Added</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="holdingsBody"></tbody>
+    </table>
+</div>
+
+<!-- Add Stock Modal -->
+<div id="addModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; display:none; align-items:center; justify-content:center;">
+    <div class="card" style="width:90%; max-width:480px; position:relative;">
+        <button onclick="closeAddModal()" style="position:absolute; top:12px; right:16px; background:none; border:none; color:var(--muted); font-size:1.4em; cursor:pointer;">&times;</button>
+        <h2 style="margin-bottom:16px;">Add Stock to Holdings</h2>
+        <div class="form-group">
+            <label>Search by name or ticker</label>
+            <input type="text" id="stockSearch" placeholder="e.g. Reliance, TCS, INFY..." oninput="searchStocks()" autocomplete="off">
+        </div>
+        <div id="searchResults" style="max-height:300px; overflow-y:auto;"></div>
+    </div>
+</div>
+
+<script>
+const ALL_STOCKS = {
+    {% for ticker, name in config.NIFTY_50.items() %}
+    "{{ ticker }}": "{{ name }}",
+    {% endfor %}
+    {% for ticker, name in config.NIFTY_NEXT_50.items() %}
+    "{{ ticker }}": "{{ name }}",
+    {% endfor %}
+};
+
+let holdingsData = [];
+
+function returnColor(val) {
+    if (val === null || val === undefined) return '';
+    return val >= 0 ? 'green' : 'red';
+}
+
+function fmtReturn(val) {
+    if (val === null || val === undefined) return 'N/A';
+    return `${val >= 0 ? '+' : ''}${val}%`;
+}
+
+function renderHoldings(holdings) {
+    holdingsData = holdings;
+
+    if (holdings.length === 0) {
+        document.getElementById('holdings-table').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('totalCount').textContent = '0';
+        document.getElementById('avgReturn').textContent = '—';
+        document.getElementById('topPerformer').textContent = '—';
+        document.getElementById('topPerformerReturn').textContent = '';
+        return;
+    }
+
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('holdings-table').style.display = 'block';
+
+    // Summary
+    const valid = holdings.filter(h => !h.error && h.returns_1y !== null && h.returns_1y !== undefined);
+    document.getElementById('totalCount').textContent = holdings.length;
+
+    if (valid.length > 0) {
+        const avg = (valid.reduce((a, h) => a + h.returns_1y, 0) / valid.length).toFixed(1);
+        document.getElementById('avgReturn').className = returnColor(parseFloat(avg));
+        document.getElementById('avgReturn').textContent = fmtReturn(parseFloat(avg));
+
+        const top = valid.reduce((best, h) => h.returns_1y > best.returns_1y ? h : best, valid[0]);
+        document.getElementById('topPerformer').textContent = top.name;
+        document.getElementById('topPerformerReturn').innerHTML = `<span class="${returnColor(top.returns_1y)}">${fmtReturn(top.returns_1y)}</span>`;
+    }
+
+    // Table
+    const tbody = document.getElementById('holdingsBody');
+    tbody.innerHTML = holdings.map((h, i) => {
+        if (h.error) {
+            return `<tr>
+                <td>${i + 1}</td>
+                <td><div style="font-weight:600;">${h.name}</div><div style="font-size:0.75em; color:var(--muted);">${h.ticker.replace('.NS','')}</div></td>
+                <td colspan="7" style="color:var(--muted);">Could not fetch data</td>
+                <td><button class="btn-remove" onclick="removeStock('${h.ticker}')">Remove</button></td>
+            </tr>`;
+        }
+        const range52w = (h['52w_low'] && h['52w_high'])
+            ? `Rs.${h['52w_low'].toLocaleString('en-IN')} — Rs.${h['52w_high'].toLocaleString('en-IN')}`
+            : 'N/A';
+        return `<tr>
+            <td>${i + 1}</td>
+            <td>
+                <div style="font-weight:600;">${h.name}</div>
+                <div style="font-size:0.75em; color:var(--muted);">${h.ticker.replace('.NS','')}</div>
+            </td>
+            <td><span class="badge badge-purple">${h.sector || 'Other'}</span></td>
+            <td style="font-weight:600;">Rs.${h.current_price ? h.current_price.toLocaleString('en-IN') : 'N/A'}</td>
+            <td class="${returnColor(h.returns_1m)}">${fmtReturn(h.returns_1m)}</td>
+            <td class="${returnColor(h.returns_6m)}">${fmtReturn(h.returns_6m)}</td>
+            <td class="${returnColor(h.returns_1y)}">${fmtReturn(h.returns_1y)}</td>
+            <td>${h.pe_ratio ? h.pe_ratio.toFixed(1) : 'N/A'}</td>
+            <td style="font-size:0.85em;">${range52w}</td>
+            <td style="font-size:0.8em; color:var(--muted);">${h.added_at}</td>
+            <td><button class="btn-remove" onclick="removeStock('${h.ticker}')">Remove</button></td>
+        </tr>`;
+    }).join('');
+}
+
+async function loadHoldings() {
+    document.getElementById('loading').style.display = 'block';
+    try {
+        const res = await fetch('/api/holdings');
+        const data = await res.json();
+        renderHoldings(data);
+    } catch (err) {
+        document.getElementById('loading').textContent = 'Failed to load holdings.';
+        return;
+    }
+    document.getElementById('loading').style.display = 'none';
+}
+
+async function addStock(ticker) {
+    const res = await fetch('/api/holdings/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ticker}),
+    });
+    const data = await res.json();
+    if (res.ok) {
+        closeAddModal();
+        loadHoldings();
+    } else {
+        alert(data.error || 'Failed to add stock');
+    }
+}
+
+async function removeStock(ticker) {
+    if (!confirm(`Remove ${ticker.replace('.NS','')} from holdings?`)) return;
+    const res = await fetch('/api/holdings/remove', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ticker}),
+    });
+    if (res.ok) loadHoldings();
+}
+
+function openAddModal() {
+    const modal = document.getElementById('addModal');
+    modal.style.display = 'flex';
+    document.getElementById('stockSearch').value = '';
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('stockSearch').focus();
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+}
+
+function searchStocks() {
+    const q = document.getElementById('stockSearch').value.toLowerCase();
+    const container = document.getElementById('searchResults');
+
+    if (q.length < 2) {
+        container.innerHTML = '<p style="color:var(--muted); font-size:0.85em; padding:8px 0;">Type at least 2 characters to search...</p>';
+        return;
+    }
+
+    const held = new Set(holdingsData.map(h => h.ticker));
+    const matches = Object.entries(ALL_STOCKS)
+        .filter(([ticker, name]) =>
+            name.toLowerCase().includes(q) || ticker.toLowerCase().includes(q)
+        )
+        .slice(0, 10);
+
+    if (matches.length === 0) {
+        container.innerHTML = '<p style="color:var(--muted); font-size:0.85em; padding:8px 0;">No matching stocks found</p>';
+        return;
+    }
+
+    container.innerHTML = matches.map(([ticker, name]) => {
+        const isHeld = held.has(ticker);
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border);">
+            <div>
+                <div style="font-weight:600;">${name}</div>
+                <div style="font-size:0.8em; color:var(--muted);">${ticker.replace('.NS','')}</div>
+            </div>
+            ${isHeld
+                ? '<span class="badge badge-green">Added</span>'
+                : `<button class="btn" style="padding:6px 16px; font-size:0.85em;" onclick="addStock('${ticker}')">Add</button>`
+            }
+        </div>`;
+    }).join('');
+}
+
+// Close modal on backdrop click
+document.getElementById('addModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAddModal();
+});
+
+loadHoldings();
+</script>
+
+<style>
+    .btn-remove {
+        background: rgba(239,68,68,0.1);
+        color: var(--red);
+        border: 1px solid rgba(239,68,68,0.2);
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 0.8em;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-remove:hover {
+        background: rgba(239,68,68,0.2);
+    }
+</style>
+
+{% endblock %}

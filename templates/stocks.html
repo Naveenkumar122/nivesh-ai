@@ -54,6 +54,9 @@
                     <th>Volatility</th>
                     <th>Max Drawdown</th>
                     <th>Score</th>
+                    {% if current_user.is_authenticated %}
+                    <th></th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody id="stockBody"></tbody>
@@ -64,6 +67,8 @@
 <script>
 let allStocks = [];
 let filteredStocks = [];
+const isLoggedIn = {{ 'true' if current_user.is_authenticated else 'false' }};
+let userHoldings = new Set();
 
 function getScoreColor(score) {
     if (score >= 75) return 'var(--green)';
@@ -142,6 +147,13 @@ function renderTable(stocks) {
                 </div>
                 <div style="font-size:0.7em; color:${getScoreColor(s.score)};">${getScoreLabel(s.score)}</div>
             </td>
+            ${isLoggedIn ? `<td>
+                <button class="btn${userHoldings.has(s.ticker) ? '-held' : '-add'}"
+                    onclick="toggleHolding('${s.ticker}', this)"
+                    id="hold-${s.ticker.replace('.','_')}">
+                    ${userHoldings.has(s.ticker) ? 'Added' : '+ Add'}
+                </button>
+            </td>` : ''}
         </tr>
     `).join('');
 }
@@ -215,7 +227,66 @@ async function refreshData() {
     btn.textContent = 'Refresh Data';
 }
 
-loadStocks();
+async function loadUserHoldings() {
+    if (!isLoggedIn) return;
+    try {
+        const res = await fetch('/api/holdings');
+        const data = await res.json();
+        userHoldings = new Set(data.map(h => h.ticker));
+    } catch (e) {}
+}
+
+async function toggleHolding(ticker, btn) {
+    const isHeld = userHoldings.has(ticker);
+    const url = isHeld ? '/api/holdings/remove' : '/api/holdings/add';
+    btn.disabled = true;
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ticker}),
+        });
+        if (res.ok) {
+            if (isHeld) {
+                userHoldings.delete(ticker);
+                btn.textContent = '+ Add';
+                btn.className = 'btn-add';
+            } else {
+                userHoldings.add(ticker);
+                btn.textContent = 'Added';
+                btn.className = 'btn-held';
+            }
+        }
+    } catch (e) {}
+    btn.disabled = false;
+}
+
+// Load holdings first, then stocks
+loadUserHoldings().then(() => loadStocks());
 </script>
+
+<style>
+.btn-add {
+    background: rgba(124,92,252,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(124,92,252,0.2);
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-add:hover { background: rgba(124,92,252,0.2); }
+.btn-held {
+    background: rgba(34,197,94,0.1);
+    color: var(--green);
+    border: 1px solid rgba(34,197,94,0.2);
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+.btn-held:hover { background: rgba(239,68,68,0.1); color: var(--red); border-color: rgba(239,68,68,0.2); }
+</style>
 
 {% endblock %}
